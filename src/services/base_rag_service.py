@@ -14,7 +14,7 @@ class BaseRAGService(ABC):
     """
     通用 RAG 骨架：
     1. 先用 Embedding Manager 產生 Query Embedding
-    2. 在 Vector DB (via VectorStoreManager) 檢索 context，每段以 dict 形式: {"doc_id","text","score"}
+    2. 在 Vector DB (via VectorStoreManager) 檢索 context，每段以 dict 形式: {"uid","text","score"}
     3. build_prompt() 組合 Prompt -> 呼叫 LLM 產生 JSON
     4. post_process() 做後處理 (例如插入 similarity_score, start_idx, end_idx)
     5. 回傳最終 JSON string
@@ -27,7 +27,7 @@ class BaseRAGService(ABC):
         llm_manager: LLMManager,
         domain_key: str,
         selected_llm_name: str | None = None,
-        k: int = 10,
+        k: int = 15,
         extra_cfg: Dict[str, Any] | None = None,
         **kwargs
     ):
@@ -52,7 +52,7 @@ class BaseRAGService(ABC):
         子類必須實作：根據 user_query 與檢索到的 context_docs (List[dict]) 來組合 Prompt。
         context_docs 的每個元素結構為:
         {
-          "doc_id": <str>,
+          "uid": <str>,
           "text": <str>,
           "score": <float>
         }
@@ -68,47 +68,10 @@ class BaseRAGService(ABC):
         """
         預設行為：
           - 幫 evidence -> start_idx/end_idx
-          - 用 doc_id 對應 similarity_score
+          - 用 uid 對應 similarity_score
         """
-        return self._default_post_process(user_query, raw_json, hits)
+        raise NotImplementedError("Subclasses must implement post_process()")
 
-    def _default_post_process(
-        self,
-        user_query: str,
-        records: list[dict],
-        hits: List[dict]
-    ) -> list[dict]:
-        """
-        1. 依 LLM 輸出的 doc_id 去對應 hits 找到 score
-        2. evidence -> start_idx/end_idx
-        """
-        ev_key = self.cfg["evidence_key"]
-        s_key, e_key = self.cfg["start_idx_key"], self.cfg["end_idx_key"]
-
-        for rec in records:
-            # 1) 找到 hits 裏面對應的 doc
-            doc_id_from_llm = rec.get("doc_id", "")
-            match_doc = next((h for h in hits if h["doc_id"] == doc_id_from_llm), None)
-            if match_doc:
-                rec["similarity_score"] = match_doc["score"]
-            else:
-                rec["similarity_score"] = 0.0
-
-            # 2) 補 evidence offset
-            evidence_txt = rec.get(ev_key, "")
-            if evidence_txt:
-                start_idx = user_query.find(evidence_txt)
-                if start_idx != -1:
-                    end_idx = start_idx + len(evidence_txt)
-                else:
-                    end_idx = -1
-            else:
-                start_idx = -1
-                end_idx = -1
-
-            rec[s_key], rec[e_key] = start_idx, end_idx
-
-        return records
 
     # ---------- helper ---------- #
     def _strip_code_fence(self, text: str) -> str:
@@ -126,7 +89,7 @@ class BaseRAGService(ABC):
     def retrieve_context(self, user_query: str, filters: Dict[str, Any] | None) -> List[dict]:
         """
         1) Embedding user_query
-        2) Search in VectorStore: return List[dict], each dict has {"doc_id","text","score"}
+        2) Search in VectorStore: return List[dict], each dict has {"uid","text","score"}
         3) 過濾 similarity < min_similarity
         4) 排序後回傳
         """
@@ -137,7 +100,7 @@ class BaseRAGService(ABC):
             k=self.top_k,
             filters=filters
         )
-        # hits: List[dict] = [{"doc_id":"xx","text":"...","score":0.88}, ...]
+        # hits: List[dict] = [{"uid":"xx","text":"...","score":0.88}, ...]
 
         # sort by score desc
         hits.sort(key=lambda x: x["score"], reverse=True)

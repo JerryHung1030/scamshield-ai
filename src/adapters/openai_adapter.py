@@ -27,7 +27,7 @@ class OpenAIAdapter(LLMAdapter):
         :param max_tokens: 回應最大 token 數
         """
         # 固定使用 "gpt-4o" 作為 model 名稱
-        super().__init__(model=model_name)
+        # super().__init__(model=model_name)
 
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -59,7 +59,7 @@ class OpenAIAdapter(LLMAdapter):
         """
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model=self.model_name,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,

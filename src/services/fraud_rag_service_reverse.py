@@ -1,4 +1,4 @@
-# src/services/fraud_rag_service.py
+
 import logging
 from typing import List, Dict, Any
 from .base_rag_service import BaseRAGService
@@ -7,7 +7,7 @@ import json
 logger = logging.getLogger(__name__)
 
 
-class FraudRAGService(BaseRAGService):
+class FraudRAGService_reverse(BaseRAGService):
     """
     詐騙偵測：
     - prompt 要求 output 欄位：code、label、evidence、confidence、start_idx、end_idx
@@ -33,7 +33,7 @@ class FraudRAGService(BaseRAGService):
         )
         self.blacklist_manager = blacklist_manager
         self.prompt_header = (
-            "你是詐騙分類偵測器，根據下方user貼文chunk，判斷貼文chunk內容是否有命中以下詐騙分類。如沒有命中請直接輸出[]。\n"
+            "你是詐騙分類偵測器，根據下方user貼文chunk，判斷貼文chunk內容是否有命中以下詐騙分類。如沒有命中請直接輸出[]。並請回傳貼文內容chunk對應的uid。\n"
             "請直接輸出JSON array, 格式：\n"
             "[\n"
             "  {\n"
@@ -59,7 +59,7 @@ class FraudRAGService(BaseRAGService):
 
         guide = """
         {
-            "uid": "....",
+            "uid": "<請回傳貼文內容chunk對應的uid>",
             "label": "....",
             "confidence": <請你自行判斷該label的可信程度0~1>,
 
@@ -68,8 +68,8 @@ class FraudRAGService(BaseRAGService):
 
         return (
             f"{self.prompt_header}\n"
-            f"詐騙分類: {user_query}\n"
-            f"---貼文內容---\n{docs_txt}\n"
+            f"貼文內容chunk與其對應uid: {user_query}\n"
+            f"---候選詐騙分類---\n{docs_txt}\n"
             f"範例: {guide}\n"
             "請務必回傳JSON array，每個物件必須包含 uid, label, confidence"
         )
